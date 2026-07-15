@@ -1,4 +1,4 @@
-# # BeamCal Engine v1.0
+# BEAM ANALYSIS ACI318-14
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
