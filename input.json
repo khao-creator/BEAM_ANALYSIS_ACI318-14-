@@ -1,0 +1,74 @@
+{
+  "fc_prime": 240,
+  "fy": 4000,
+  "fy_shear": 4000,
+
+  "b": 30,
+  "b_unit": "cm",
+  "h": 60,
+  "h_unit": "cm",
+
+  "covering": 6,
+  "cov_unit": "cm",
+
+  "stirrup_dia": 9,
+  "stirrup_spacing": 20,
+  "stirrup_legs": 2,
+  "Al_provided_mm2": 0,
+
+  "forces": {
+    "INITIAL": {
+      "Mu": 45000,
+      "Mu_unit": "kg-m",
+      "Vu": 8000,
+      "Vu_unit": "kg",
+      "Pu": 0,
+      "Pu_unit": "kg",
+      "Tu": 0,
+      "Tu_unit": "kg-m"
+    },
+    "MID": {
+      "Mu": 45000,
+      "Mu_unit": "kg-m",
+      "Vu": 8000,
+      "Vu_unit": "kg",
+      "Pu": 0,
+      "Pu_unit": "kg",
+      "Tu": 0,
+      "Tu_unit": "kg-m"
+    },
+    "END": {
+      "Mu": 0,
+      "Mu_unit": "kg-m",
+      "Vu": 0,
+      "Vu_unit": "kg",
+      "Pu": 0,
+      "Pu_unit": "kg",
+      "Tu": 0,
+      "Tu_unit": "kg-m"
+    }
+  },
+
+  "rebars": {
+    "INITIAL": {
+      "top": [
+        { "dia": 20, "qty": 2, "clear_dist": 0 }
+      ],
+      "bot": [
+        { "dia": 25, "qty": 4, "clear_dist": 0 }
+      ]
+    },
+    "MID": {
+      "top": [
+        { "dia": 20, "qty": 2, "clear_dist": 0 }
+      ],
+      "bot": [
+        { "dia": 25, "qty": 4, "clear_dist": 0 }
+      ]
+    },
+    "END": {
+      "top": [],
+      "bot": []
+    }
+  }
+}
