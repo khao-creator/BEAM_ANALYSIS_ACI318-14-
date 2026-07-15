@@ -19,24 +19,38 @@ The flexural engine evaluates the strength of reinforced concrete beam sections 
 
 ### Core Formulation
 
-- **Whitney stress block:**
-  $$a = \beta_1 c$$
-- **Concrete compression force:**
-  $$C_c = 0.85 f'_c a b$$
-- **Steel stress (limited to $\pm f_y$):**
-  $$f_{si} = \max(-f_y, \min(f_y, E_s \epsilon_{si}))$$
-- **Force equilibrium:**
-  $$C_c + \sum C_s - \sum T_s - P_u = 0$$
-- **Strength reduction factor:**
-  $$\phi = f(\epsilon_t)$$
-- **Nominal moment capacity (about geometric centroid $y_c = h/2$):**
-  $$M_n = \sum F_i (y_i - y_c)$$
-- **Design strength verification:**
-  $$\phi M_n \ge M_u$$
+* **Whitney stress block:**
+
+$$a = \beta_1 c$$
+
+* **Concrete compression force:**
+
+$$C_c = 0.85 f'_c a b$$
+
+* **Steel stress (limited to $\pm f_y$):**
+
+$$f_{si} = \max(-f_y, \, \min(f_y, \, E_s \epsilon_{si}))$$
+
+* **Force equilibrium:**
+
+$$C_c + \sum C_s - \sum T_s - P_u = 0$$
+
+* **Strength reduction factor:**
+
+$$\phi = f(\epsilon_t)$$
+
+* **Nominal moment capacity (about geometric centroid $y_c = h/2$):**
+
+$$M_n = \sum F_i (y_i - y_c)$$
+
+* **Design strength verification:**
+
+$$\phi M_n \ge M_u$$
 
 ### Program Applicability Limit (Beam Module)
 
 To prevent misapplication of the beam design module under high axial forces, the program enforces:
+
 $$P_u \le 0.10 f'_c A_g$$
 
 ---
@@ -47,32 +61,44 @@ Evaluates concrete and stirrup capacity under factored shear loads ($V_u$), inco
 
 ### Core Formulation
 
-- **Concrete shear strength ($V_c$):**
-  - Axial compression ($P_u > 0$):
-    $$V_c = 0.53 \left(1 + \frac{P_u}{140 A_g}\right) \sqrt{f'_c} \, b \, d \quad \le 0.53 \times 1.5 \sqrt{f'_c} \, b \, d$$
-  - Axial tension ($P_u < 0$):
-    $$V_c = \max\left(0, \, 0.53 \left(1 + \frac{P_u}{35 A_g}\right) \sqrt{f'_c} \, b \, d\right)$$
-  - No axial load ($P_u = 0$):
-    $$V_c = 0.53 \sqrt{f'_c} \, b \, d$$
+* **Concrete shear strength ($V_c$):**
 
-- **Stirrup shear strength ($V_s$):**
-  $$V_s = \frac{A_v f_{yt} d}{s}$$
+  * **Axial compression ($P_u > 0$):**
 
-- **Design shear strength verification (with $\phi = 0.85$):**
-  $$\phi V_n = \phi (V_c + V_s) \ge V_u$$
+$$V_c = 0.53 \left(1 + \frac{P_u}{140 A_g}\right) \sqrt{f'_c} b d \quad \le 0.53 \times 1.5 \sqrt{f'_c} b d$$
 
-- **Stirrup spacing limits ($s_{max}$)**, based on the required stirrup strength contribution ($V_{s,req} = \frac{V_u}{\phi} - V_c$):
-  $$s_{max} = \begin{cases}
-  \min(d/4, \, 30 \text{ cm}) & V_{s,req} > 1.1 \sqrt{f'_c} \, b \, d \\
-  \min(d/2, \, 60 \text{ cm}) & V_{s,req} \le 1.1 \sqrt{f'_c} \, b \, d
-  \end{cases}$$
+  * **Axial tension ($P_u < 0$):**
 
-- **Minimum shear reinforcement** (required when $V_u > 0.5 \phi V_c$):
-  $$\left(\frac{A_v}{s}\right)_{min} = \max\left(\frac{0.2 \sqrt{f'_c} \, b}{f_{yt}}, \, \frac{3.5 \, b}{f_{yt}}\right)$$
+$$V_c = \max\left(0, \, 0.53 \left(1 + \frac{P_u}{35 A_g}\right) \sqrt{f'_c} b d\right)$$
 
-- **Maximum stirrup contribution limit:**
-  $$V_s \le 2.1 \sqrt{f'_c} \, b \, d$$
-  *(Limits stirrup steel to prevent brittle concrete web crushing failure)*
+  * **No axial load ($P_u = 0$):**
+
+$$V_c = 0.53 \sqrt{f'_c} b d$$
+
+* **Stirrup shear strength ($V_s$):**
+
+$$V_s = \frac{A_v f_{yt} d}{s}$$
+
+* **Design shear strength verification (with $\phi = 0.85$):**
+
+$$\phi V_n = \phi (V_c + V_s) \ge V_u$$
+
+* **Stirrup spacing limits ($s_{\text{max}}$), based on the required stirrup strength contribution ($V_{s,\text{req}} = \frac{V_u}{\phi} - V_c$):**
+
+$$s_{\text{max}} = \begin{cases} 
+\min(d/4, \, 30 \text{ cm}) & V_{s,\text{req}} > 1.1 \sqrt{f'_c} b d \\ 
+\min(d/2, \, 60 \text{ cm}) & V_{s,\text{req}} \le 1.1 \sqrt{f'_c} b d 
+\end{cases}$$
+
+* **Minimum shear reinforcement (required when $V_u > 0.5 \phi V_c$):**
+
+$$\left(\frac{A_v}{s}\right)_{\text{min}} = \max\left(\frac{0.2 \sqrt{f'_c} b}{f_{yt}}, \, \frac{3.5 b}{f_{yt}}\right)$$
+
+* **Maximum stirrup contribution limit:**
+
+$$V_s \le 2.1 \sqrt{f'_c} b d$$
+
+*(Limits stirrup steel to prevent brittle concrete web crushing failure)*
 
 ---
 
@@ -82,34 +108,45 @@ Evaluates the torsional capacity, checks for combined shear-torsion interaction,
 
 ### Core Formulation
 
-- **Geometric parameters (centerline of stirrup):**
-  $$x_1 = b - 2(covering + d_{stirrup}/2)$$
-  $$y_1 = h - 2(covering + d_{stirrup}/2)$$
-  $$A_{oh} = x_1 \cdot y_1, \quad p_h = 2(x_1 + y_1), \quad A_o = 0.85 A_{oh}$$
+* **Geometric parameters (centerline of stirrup):**
 
-- **Torsional threshold and cracking limits ($\phi = 0.75$):**
-  $$T_{th} = \phi \cdot 0.27 \sqrt{f'_c} \left(\frac{A_{cp}^2}{P_{cp}}\right) \quad (\text{Torsion active if } T_u > T_{th})$$
-  $$T_{cr} = \phi \cdot 1.1 \sqrt{f'_c} \left(\frac{A_{cp}^2}{P_{cp}}\right)$$
-  *(where $A_{cp} = b \cdot h$ and $P_{cp} = 2(b + h)$)*
+$$x_1 = b - 2(\text{covering} + d_{\text{stirrup}}/2)$$
+$$y_1 = h - 2(\text{covering} + d_{\text{stirrup}}/2)$$
+$$A_{oh} = x_1 \cdot y_1, \quad p_h = 2(x_1 + y_1), \quad A_o = 0.85 A_{oh}$$
 
-- **Combined shear-torsion web crushing limit ($\phi = 0.85$):**
-  $$\sqrt{\left(\frac{V_u}{b d}\right)^2 + \left(\frac{T_u p_h}{1.7 A_{oh}^2}\right)^2} \le \phi \left(\frac{V_c}{b d} + 2.1\sqrt{f'_c}\right)$$
+* **Torsional threshold and cracking limits ($\phi = 0.75$):**
 
-- **Torsional transverse reinforcement (per single stirrup leg):**
-  $$\frac{A_t}{s} = \frac{T_u}{2 \phi A_o f_{yt}} \quad (\text{with } \phi = 0.75)$$
+$$T_{\text{th}} = \phi \cdot 0.27 \sqrt{f'_c} \left(\frac{A_{\text{cp}}^2}{P_{\text{cp}}}\right) \quad (\text{Torsion active if } T_u > T_{\text{th}})$$
 
-- **Combined shear and torsion minimum area limit:**
-  $$\text{Governing stirrup ratio} = \max\left(\frac{A_{v,shear}}{s} + \frac{2 A_t}{s}, \, \left(\frac{A_v}{s}\right)_{min}\right)$$
-  *(where $\left(\frac{A_v}{s}\right)_{min}$ is the code minimum shear reinforcement ratio)*
+$$T_{\text{cr}} = \phi \cdot 1.1 \sqrt{f'_c} \left(\frac{A_{\text{cp}}^2}{P_{\text{cp}}}\right)$$
 
-- **Maximum torsion stirrup spacing limit:**
-  $$s_{max} = \min(p_h / 8, \, 30 \text{ cm})$$
+*(where $A_{\text{cp}} = b \cdot h$ and $P_{\text{cp}} = 2(b + h)$)*
 
-- **Longitudinal torsion reinforcement ($A_l$):**
-  $$A_l = \max(A_{l,req}, \, \max(0.0, \, A_{l,min}))$$
-  $$A_{l,req} = \left(\frac{A_t}{s}\right) p_h \left(\frac{f_{yt}}{f_y}\right)$$
-  $$A_{l,min} = \frac{1.33 \sqrt{f'_c} \, A_{cp}}{f_y} - \left(\frac{A_t}{s}\right)_{clamped} p_h \left(\frac{f_{yt}}{f_y}\right)$$
-  *(where the clamp is defined as $\left(\frac{A_t}{s}\right)_{clamped} = \max\left(\frac{A_t}{s}, \, \frac{1.78 \, b}{f_{yt}}\right)$)*
+* **Combined shear-torsion web crushing limit ($\phi = 0.85$):**
+
+$$\sqrt{\left(\frac{V_u}{b d}\right)^2 + \left(\frac{T_u p_h}{1.7 A_{oh}^2}\right)^2} \le \phi \left(\frac{V_c}{b d} + 2.1\sqrt{f'_c}\right)$$
+
+* **Torsional transverse reinforcement (per single stirrup leg):**
+
+$$\frac{A_t}{s} = \frac{T_u}{2 \phi A_o f_{yt}} \quad (\text{with } \phi = 0.75)$$
+
+* **Combined shear and torsion minimum area limit:**
+
+$$\text{Governing stirrup ratio} = \max\left(\frac{A_{v,\text{shear}}}{s} + \frac{2 A_t}{s}, \, \left(\frac{A_v}{s}\right)_{\text{min}}\right)$$
+
+*(where $\left(\frac{A_v}{s}\right)_{\text{min}}$ is the code minimum shear reinforcement ratio)*
+
+* **Maximum torsion stirrup spacing limit:**
+
+$$s_{\text{max}} = \min(p_h / 8, \, 30 \text{ cm})$$
+
+* **Longitudinal torsion reinforcement ($A_l$):**
+
+$$A_l = \max(A_{l,\text{req}}, \, \max(0.0, \, A_{l,\text{min}}))$$
+$$A_{l,\text{req}} = \left(\frac{A_t}{s}\right) p_h \left(\frac{f_{yt}}{f_y}\right)$$
+$$A_{l,\text{min}} = \frac{1.33 \sqrt{f'_c} A_{\text{cp}}}{f_y} - \left(\frac{A_t}{s}\right)_{\text{clamped}} p_h \left(\frac{f_{yt}}{f_y}\right)$$
+
+*(where the clamp is defined as $\left(\frac{A_t}{s}\right)_{\text{clamped}} = \max\left(\frac{A_t}{s}, \, \frac{1.78 b}{f_{yt}}\right)$)*
 
 ---
 
