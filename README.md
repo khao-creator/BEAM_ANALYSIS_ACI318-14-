@@ -86,8 +86,8 @@ $$\phi V_n = \phi (V_c + V_s) \ge V_u$$
 * **Stirrup spacing limits ($s_{\text{max}}$), based on the required stirrup strength contribution ($V_{s,\text{req}} = \frac{V_u}{\phi} - V_c$):**
 
 $$s_{\text{max}} = \begin{cases} 
-\min(d/4, \, 30 \text{ cm}) \, V_{s,\text{req}} > 1.1 \sqrt{f'_c} b d \\ 
-\min(d/2, \, 60 \text{ cm}) \, V_{s,\text{req}} \le 1.1 \sqrt{f'_c} b d 
+\min(d/4 \, 30 \text{ cm}) \, V_{s,\text{req}} > 1.1 \sqrt{f'_c} b d \\ 
+\min(d/2 \, 60 \text{ cm}) \, V_{s,\text{req}} \le 1.1 \sqrt{f'_c} b d 
 \end{cases}$$
 
 * **Minimum shear reinforcement (required when $V_u > 0.5 \phi V_c$):**
