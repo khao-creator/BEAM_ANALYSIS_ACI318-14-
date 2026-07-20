@@ -92,7 +92,7 @@ $$s_{\text{max}} = \begin{cases}
 
 * **Minimum shear reinforcement (required when $V_u > 0.5 \phi V_c$):**
 
-$$\left(\frac{A_v}{s}\right)_{\text{min}} = \max\left(\frac{0.2 \sqrt{f'_c} b}{f_{yt}}, \, \frac{3.5 b}{f_{yt}}\right)$$
+$$\left(\frac{A_v}{s}\right)_{\text{min}} = \max\left(\frac{0.2 \sqrt{f'_c} b}{f_{yt}} \, \frac{3.5 b}{f_{yt}}\right)$$
 
 * **Maximum stirrup contribution limit:**
 
@@ -120,7 +120,7 @@ $$T_{\text{th}} = \phi \cdot 0.27 \sqrt{f'_c} \left(\frac{A_{\text{cp}}^2}{P_{\t
 
 $$T_{\text{cr}} = \phi \cdot 1.1 \sqrt{f'_c} \left(\frac{A_{\text{cp}}^2}{P_{\text{cp}}}\right)$$
 
-*(where $A_{\text{cp}} = b \cdot h$ and $P_{\text{cp}} = 2(b + h)$)*
+(where $A_{\text{cp}} = b \cdot h$ and $P_{\text{cp}} = 2(b + h)$)*
 
 * **Combined shear-torsion web crushing limit ($\phi = 0.85$):**
 
@@ -134,7 +134,7 @@ $$\frac{A_t}{s} = \frac{T_u}{2 \phi A_o f_{yt}} \quad (\text{with } \phi = 0.75)
 
 $$\text{Governing stirrup ratio} = \max\left(\frac{A_{v,\text{shear}}}{s} + \frac{2 A_t}{s}, \, \left(\frac{A_v}{s}\right)_{\text{min}}\right)$$
 
-*(where $\left(\frac{A_v}{s}\right)_{\text{min}}$ is the code minimum shear reinforcement ratio)*
+(where $\left(\frac{A_v}{s}\right)_{\text{min}}$ is the code minimum shear reinforcement ratio)*
 
 * **Maximum torsion stirrup spacing limit:**
 
@@ -146,7 +146,7 @@ $$A_l = \max(A_{l,\text{req}}, \, \max(0.0, \, A_{l,\text{min}}))$$
 $$A_{l,\text{req}} = \left(\frac{A_t}{s}\right) p_h \left(\frac{f_{yt}}{f_y}\right)$$
 $$A_{l,\text{min}} = \frac{1.33 \sqrt{f'_c} A_{\text{cp}}}{f_y} - \left(\frac{A_t}{s}\right)_{\text{clamped}} p_h \left(\frac{f_{yt}}{f_y}\right)$$
 
-*(where the clamp is defined as $\left(\frac{A_t}{s}\right)_{\text{clamped}} = \max\left(\frac{A_t}{s}, \, \frac{1.78 b}{f_{yt}}\right)$)*
+(where the clamp is defined as $\left(\frac{A_t}{s}\right)_{\text{clamped}} = \max\left(\frac{A_t}{s}, \, \frac{1.78 b}{f_{yt}}\right)$)*
 
 ---
 
