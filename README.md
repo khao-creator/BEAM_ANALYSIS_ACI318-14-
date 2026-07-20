@@ -147,7 +147,7 @@ $$A_l = \max(A_{l,\text{req}}, \, \max(0.0, \, A_{l,\text{min}}))$$
 $$A_{l,\text{req}} = \left(\frac{A_t}{s}\right) p_h \left(\frac{f_{yt}}{f_y}\right)$$
 $$A_{l,\text{min}} = \frac{1.33 \sqrt{f'_c} A_{\text{cp}}}{f_y} - \left(\frac{A_t}{s}\right)_{\text{clamped}} p_h \left(\frac{f_{yt}}{f_y}\right)$$
 
-$$ \left( \text{where the clamp is defined as } \left(\frac{A_t}{s}\right)_{\text{clamped}} = \max\left(\frac{A_t}{s}, \, \frac{1.78 b}{f_{yt}}\right) \right) $$
+$$ \left( \text{where the clamp is defined as } \left(\frac{A_t}{s}\right)_{\text{clamped}} = \max\left(\frac{A_t}{s} \, \frac{1.78 b}{f_{yt}}\right) \right) $$
 
 ---
 
