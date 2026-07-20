@@ -29,7 +29,7 @@ $$C_c = 0.85 f'_c a b$$
 
 * **Steel stress (limited to $\pm f_y$):**
 
-$$f_{si} = \max(-f_y, \, \min(f_y, \, E_s \epsilon_{si}))$$
+$$f_{si} = \max(-f_y, \, \min(f_y \, E_s \epsilon_{si}))$$
 
 * **Force equilibrium:**
 
@@ -86,8 +86,8 @@ $$\phi V_n = \phi (V_c + V_s) \ge V_u$$
 * **Stirrup spacing limits ($s_{\text{max}}$), based on the required stirrup strength contribution ($V_{s,\text{req}} = \frac{V_u}{\phi} - V_c$):**
 
 $$s_{\text{max}} = \begin{cases} 
-\min(d/4, \, 30 \text{ cm}) & V_{s,\text{req}} > 1.1 \sqrt{f'_c} b d \\ 
-\min(d/2, \, 60 \text{ cm}) & V_{s,\text{req}} \le 1.1 \sqrt{f'_c} b d 
+\min(d/4, \, 30 \text{ cm}) \, V_{s,\text{req}} > 1.1 \sqrt{f'_c} b d \\ 
+\min(d/2, \, 60 \text{ cm}) \, V_{s,\text{req}} \le 1.1 \sqrt{f'_c} b d 
 \end{cases}$$
 
 * **Minimum shear reinforcement (required when $V_u > 0.5 \phi V_c$):**
@@ -132,7 +132,7 @@ $$\frac{A_t}{s} = \frac{T_u}{2 \phi A_o f_{yt}} \quad (\text{with } \phi = 0.75)
 
 * **Combined shear and torsion minimum area limit:**
 
-$$\text{Governing stirrup ratio} = \max\left(\frac{A_{v,\text{shear}}}{s} + \frac{2 A_t}{s}, \, \left(\frac{A_v}{s}\right)_{\text{min}}\right)$$
+$$\text{Governing stirrup ratio} = \max\left(\frac{A_{v,\text{shear}}}{s} + \frac{2 A_t}{s} \, \left(\frac{A_v}{s}\right)_{\text{min}}\right)$$
 
 $$ \left( \text{where } \left(\frac{A_v}{s}\right)_{\text{min}} \text{ is the code minimum shear reinforcement ratio} \right) $$
 
