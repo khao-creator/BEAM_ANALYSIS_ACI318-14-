@@ -1004,7 +1004,7 @@ def execute_engine(data: BeamInputData):
     }
     
     print("\n" + "="*85)
-    print(" BEAMCAL ENGINE v1.0 - TEXTBOOK MATHEMATICAL PROOF (ACI 318-14)")
+    print(" BEAMCAL ENGINE v1.1 - TEXTBOOK MATHEMATICAL PROOF (ACI 318-14)")
     print(f" SECTION SIZE: {data.b:.0f} x {data.h:.0f} cm  | Gross Area Ag = {data.b * data.h:.1f} cm2")
     print(f" MATERIAL    : fc' = {data.fc_prime:.0f} ksc | fy = {data.fy:.0f} ksc | fyt = {data.fy_shear:.0f} ksc")
     print("="*85)
@@ -1420,7 +1420,7 @@ class ReportSheetWindow:
 class BeamCalDashboard:
     def __init__(self, root_window):
         self.root = root_window
-        self.root.title("BeamCal ENGINE v1.0 - Cyber Structural Panel")
+        self.root.title("BeamCal ENGINE v1.1 - Cyber Structural Panel")
         self.root.geometry("1300x820")
         self.root.minsize(1200, 750)
         
