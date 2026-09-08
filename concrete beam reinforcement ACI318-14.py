@@ -1,14 +1,12 @@
-import math 
-import json
-import os
-from pydantic import BaseModel, Field 
-from typing import List 
-import tkinter as tk
-from tkinter import ttk, messagebox
 import io
+import json
+import math
+import os
+import tkinter as tk
 from contextlib import redirect_stdout
+from tkinter import messagebox, ttk
 
-
+from pydantic import BaseModel, Field
 
 # ==========================================
 # MODULE 0: UNIT CONVERSION SYSTEM
@@ -119,17 +117,20 @@ class BeamInputData(BaseModel):
     forcesmid: SectionForces      # Forces at middle section
     forcesend: SectionForces      # Forces at end/right support
     
-    topinitial_rebars: List[RebarLayer]  # Top steel bars at left support
-    botinitial_rebars: List[RebarLayer]  # Bottom steel bars at left support
-    topmid_rebars: List[RebarLayer]      # Top steel bars at middle
-    botmid_rebars: List[RebarLayer]      # Bottom steel bars at middle
-    topend_rebars: List[RebarLayer]      # Top steel bars at right support
-    botend_rebars: List[RebarLayer]      # Bottom steel bars at right support
+    topinitial_rebars: list[RebarLayer]          # Top steel bars at left support
+    sideinitial_rebars: list[RebarLayer] = []    # Side steel bars (Al) at left support
+    botinitial_rebars: list[RebarLayer]          # Bottom steel bars at left support
+    topmid_rebars: list[RebarLayer]              # Top steel bars at middle
+    sidemid_rebars: list[RebarLayer] = []        # Side steel bars (Al) at middle
+    botmid_rebars: list[RebarLayer]              # Bottom steel bars at middle
+    topend_rebars: list[RebarLayer]              # Top steel bars at right support
+    sideend_rebars: list[RebarLayer] = []        # Side steel bars (Al) at right support
+    botend_rebars: list[RebarLayer]              # Bottom steel bars at right support
 
 # ==========================================
 # MODULE 2: GEOMETRY, EFFECTIVE DEPTH (d), & REBAR SPACING CHECK
 # ==========================================
-def calculate_rebar_group_properties(layers: List[RebarLayer], b: float, covering: float, stirrup_dia_mm: float):
+def calculate_rebar_group_properties(layers: list[RebarLayer], b: float, covering: float, stirrup_dia_mm: float):
     # 1.Check empty case: If no steel layers, return 0 to avoid zero division error
     if not layers:
         return {"total_area_cm2": 0.0, "y_bar_cm": 0.0, "warnings": []}
@@ -142,7 +143,7 @@ def calculate_rebar_group_properties(layers: List[RebarLayer], b: float, coverin
     
     # 3. Calculate net width inside stirrups
     net_width = b - (2 * covering) - (2 * stirrup_cm)
-    warnings = [] # List for holding spacing error messages
+    warnings = [] # list for holding spacing error messages
     
     # Stop here if beam dimensions are impossible
     if net_width <= 0:
@@ -278,8 +279,7 @@ def design_flexure(Mu_kgm: float, Pu_kg: float, b: float, d: float, d_prime: flo
         elif f_s_prime < fy:
             warnings.append(f"[WARNING] Compression steel does not yield (fs' = {f_s_prime:.1f} < fy). This section uses steel inefficiently.")
             
-        if f_s_prime >= fy:
-            f_s_prime = fy # Limit stress to yield strength
+        f_s_prime = min(fy, f_s_prime) # Limit stress to yield strength
             
         # Fallback logic to prevent crash or division by zero
         if f_s_prime > 0:
@@ -314,7 +314,7 @@ def design_flexure(Mu_kgm: float, Pu_kg: float, b: float, d: float, d_prime: flo
         "As_min_cm2": round(As_min, 2),
         "REQUIRED_As_TENSION_cm2": round(As_final_req, 2),
         "REQUIRED_As_COMPRESSION_cm2": round(As_prime, 2),
-        "warnings": warnings          # List of warning tags for system output
+        "warnings": warnings          # list of warning tags for system output
     }
 
 def check_flexural_capacity(As_provided: float, As_prime_provided: float, Mu_kgm: float, Pu_kg: float, b: float, h: float, d: float, d_prime: float, fc_prime: float, fy: float):
@@ -334,8 +334,7 @@ def check_flexural_capacity(As_provided: float, As_prime_provided: float, Mu_kgm
     # 1. Internal function to calculate internal force imbalance (residual)
     def calculate_residual(c_target): # Depth of concrete stress block
         a_target = beta1 * c_target
-        if a_target > h:
-            a_target = h # Clip stress block depth to beam height
+        a_target = min(a_target, h) # Clip stress block depth to beam height
         
         Cc_target = 0.85 * fc_prime * a_target * b # Concrete compression force component
         Cs_total = 0.0 # Reset total compression steel force
@@ -469,7 +468,7 @@ def check_flexural_capacity(As_provided: float, As_prime_provided: float, Mu_kgm
     
     # 7. Summarize capacity check results and check compliance tracks
     Ag = b * h
-    max_beam_compression = 0.10 * fc_prime * Ag # เกณฑ์แรงอัดสูงสุดที่ยอมให้เป็นพฤติกรรมคาน
+    max_beam_compression = 0.10 * fc_prime * Ag # Limit for pure beam flexural behavior
     
     is_moment_safe = phi_Mn_kgm >= abs(Mu_kgm)
     is_axial_safe = Pu_kg <= max_beam_compression if Pu_kg > 0 else True
@@ -724,7 +723,7 @@ def check_shear_capacity(Vu_kg: float, Pu_kg: float, b: float, h: float, d: floa
         if not is_strength_safe:
             reasons_list.append("Strength insufficient (phi*Vn < Vu)")
         for dr in detailing_reasons:
-            reasons_list.append(dr)
+            reasons_list.append(dr)  # noqa: PERF402
         # Format diagnostics as numbered items for clean layout
         reason_str = "[CRITICAL] Deficiencies found:\n" + "\n".join([f"        {idx+1}. {r}" for idx, r in enumerate(reasons_list)])
 
@@ -804,7 +803,7 @@ def design_shear(Vu_kg: float, Pu_kg: float, b: float, h: float, d: float, fc_pr
 # MODULE 5: TORSION ENGINE (ACI 318-14 Metric Precise Engine)
 # =========================================================================
 
-def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, h: float, d: float, covering: float, stirrup_dia_mm: float, spacing_cm: float, fc_prime: float, fy: float, fy_shear: float, num_legs: int = 2, Al_provided_mm2: float = 0.0, phi_torsion: float = 0.75, phi_shear: float = 0.85):
+def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, h: float, d: float, covering: float, stirrup_dia_mm: float, spacing_cm: float, fc_prime: float, fy: float, fy_shear: float, num_legs: int = 2, Al_side_mm2: float = 0.0, As_excess_tens_mm2: float = 0.0, As_excess_comp_mm2: float = 0.0, Mu_kgm: float = 0.0, phi_torsion: float = 0.75, phi_shear: float = 0.85):
     # [STEP 1] Check invalid effective depth
     if d is None:
         return {
@@ -855,7 +854,7 @@ def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, 
     checks.append({
         "check": "torsional_threshold",
         "value_kgm": round(T_threshold / 100.0, 3),
-        "tu_kgm": round(Tu_kgm, 3),
+        "tu_kgm": round(abs(Tu_kgm), 3),
         "status": "MUST_CONSIDER" if is_torsion_active else "MAY_NEGLECT"
     })
     
@@ -906,33 +905,44 @@ def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, 
     spacing_ok = (spacing_cm <= smax) if spacing_cm > 0 else False
     checks.append({"check": "stirrup_spacing_limit", "smax_cm": round(smax, 1), "status": "OK" if spacing_ok else "FAIL"})
     
-    # [STEP 7] Longitudinal reinforcement check (Al requirement)
+    # [STEP 7] Longitudinal reinforcement check (ACI 318-14 Sec 22.7.6.2 & 9.5.4.3)
+    al_theoretical_mm2 = 0.0
+    al_min_mm2 = 0.0
+    al_reduction_mm2 = 0.0
     al_final_mm2 = 0.0
+    al_total_provided_mm2 = Al_side_mm2 + As_excess_tens_mm2 + As_excess_comp_mm2
     long_ok = True
+
     if is_torsion_active:
         at_s_clamped = max(at_s, (1.78 * b) / fy_shear)
         al_req_cm2 = at_s * ph * (fy_shear / fy)
-        al_min_cm2 = (1.33 * math.sqrt(fc_prime) * Acp / fy) - (at_s_clamped * ph * (fy_shear / fy))
-        al_final_cm2 = max(al_req_cm2, max(0.0, al_min_cm2))
-        al_final_mm2 = al_final_cm2 * 100.0
-        long_ok = Al_provided_mm2 >= al_final_mm2
-        
+        al_min_calc_cm2 = (1.33 * math.sqrt(fc_prime) * Acp / fy) - (at_s_clamped * ph * (fy_shear / fy))
+        al_min_cm2 = max(0.0, al_min_calc_cm2) * 100.0
+        al_theoretical_mm2 = max(al_req_cm2 * 100.0, al_min_cm2)
+
+        # Flexural compression zone relief: Mu / (0.9 * d * fy)
+        if d > 0 and fy > 0:
+            al_reduction_mm2 = (abs(Mu_kgm * 100.0) / (0.90 * d * fy)) * 100.0
+
+        # Net Al required cannot be reduced below Al,min
+        al_final_mm2 = max(al_min_cm2, al_theoretical_mm2 - al_reduction_mm2)
+        long_ok = al_total_provided_mm2 >= al_final_mm2
+
     checks.append({
-            "check": "longitudinal_torsion_steel", 
-            "al_required_mm2": round(al_final_mm2, 1), 
-            "al_provided_mm2": Al_provided_mm2, 
-            "status": "OK" if long_ok else "FAIL"
+        "check": "longitudinal_torsion_steel",
+        "al_required_mm2": round(al_final_mm2, 1),
+        "al_provided_mm2": round(al_total_provided_mm2, 1),
+        "status": "OK" if long_ok else "FAIL"
     })
-        # Evaluate global compliance status across all independent limit states
+
     is_safe = crushing_ok and stirrup_ok and combined_min_stirrup_ok and spacing_ok and long_ok
 
-        # Determine the controlling demand-to-capacity utilization ratio
     if is_torsion_active:
-            ur_at_s = at_s / provided_at_s if provided_at_s > 0 else 999.0
-            ur_comb = governing_stirrup_ratio / provided_total_ratio if provided_total_ratio > 0 else 999.0
-            ur_spacing = spacing_cm / smax if smax > 0 else 999.0
-            ur_al = al_final_mm2 / Al_provided_mm2 if Al_provided_mm2 > 0 else (999.0 if al_final_mm2 > 0 else 0.0)
-            true_torsion_ur = max(ur_web, ur_at_s, ur_comb, ur_spacing, ur_al)
+        ur_at_s = at_s / provided_at_s if provided_at_s > 0 else 999.0
+        ur_comb = governing_stirrup_ratio / provided_total_ratio if provided_total_ratio > 0 else 999.0
+        ur_spacing = spacing_cm / smax if smax > 0 else 999.0
+        ur_al = al_final_mm2 / al_total_provided_mm2 if al_total_provided_mm2 > 0 else (999.0 if al_final_mm2 > 0 else 0.0)
+        true_torsion_ur = max(ur_web, ur_at_s, ur_comb, ur_spacing, ur_al)
     else:
         true_torsion_ur = 0.0
     
@@ -950,7 +960,7 @@ def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, 
         if not spacing_ok:
             reasons.append(f"Stirrup spacing exceeds maximum limit (Max = {smax:.1f} cm, Provided = {spacing_cm} cm)")
         if not long_ok:
-            reasons.append(f"Provided longitudinal torsion steel area is insufficient (Req = {al_final_mm2:.1f} mm2, Provided = {Al_provided_mm2:.1f} mm2)")
+            reasons.append(f"Provided longitudinal torsion steel area is insufficient (Req = {al_final_mm2:.1f} mm2, Provided = {al_total_provided_mm2:.1f} mm2)")
         
         if not reasons:
             reason_str = "[INFO] Section passed all combined shear and torsion strength checks."
@@ -963,11 +973,15 @@ def check_torsion_capacity(Tu_kgm: float, Vu_kg: float, Vc_kg: float, b: float, 
         "Utilization_Ratio": round(true_torsion_ur, 3),
         "reason": reason_str,
         "al_required_mm2": round(al_final_mm2, 1),
+        "al_theoretical_mm2": round(al_theoretical_mm2, 1),
+        "al_min_mm2": round(al_min_mm2, 1),
+        "al_reduction_mm2": round(al_reduction_mm2, 1),
+        "al_total_provided_mm2": round(al_total_provided_mm2, 1),
         "at_per_s_cm2_cm": round(at_s, 5),
         "smax_torsion_cm": round(smax, 1),
         "checks": checks,
         "warnings": warnings,
-        "Tu_tm": abs(Tu_kgm / 1000.0) if Tu_kgm > 0 else 0.0,
+        "Tu_tm": round(abs(Tu_kgm) / 1000.0, 3),
         "T_threshold_tm": round(T_threshold / 100000.0, 3),
         "T_cr_tm": round(T_cr / 100000.0, 3),
         "Aoh_cm2": round(Aoh, 1),
@@ -983,6 +997,11 @@ def execute_engine(data: BeamInputData):
     # 1. Process section geometry metrics
     geom = calculate_all_sections_geometry(data)
     sections = {"INITIAL": data.forcesinitial, "MID": data.forcesmid, "END": data.forcesend}
+    side_rebars_map = {
+        "INITIAL": data.sideinitial_rebars,
+        "MID": data.sidemid_rebars,
+        "END": data.sideend_rebars
+    }
     
     print("\n" + "="*85)
     print(" BEAMCAL ENGINE v1.0 - TEXTBOOK MATHEMATICAL PROOF (ACI 318-14)")
@@ -993,7 +1012,9 @@ def execute_engine(data: BeamInputData):
     for sec_name, forces in sections.items():
         g = geom[sec_name]
         Mu, Vu, Pu, Tu = forces.Mu, forces.Vu, forces.Pu, forces.Tu
-        is_top_tension = Mu < 0
+        # Support sections (INITIAL, END) resist hogging (Top Tension)
+        # Midspan section (MID) resists sagging (Bottom Tension)
+        is_top_tension = (sec_name != "MID")
         
         # Classify tension and compression faces based on bending sign
         d_t = g["d_top_tension"] if is_top_tension else g["d_bot_tension"]
@@ -1028,11 +1049,26 @@ def execute_engine(data: BeamInputData):
         else:
             Vc_kg = 0.53 * math.sqrt(data.fc_prime) * data.b * d_t
 
+        # Calculate excess longitudinal steel from flexure (ACI 318-14 Sec 9.5.4.3 & 22.7.6.2)
+        flex_req_data = design_flexure(Mu, Pu, data.b, d_t, d_c, data.fc_prime, data.fy)
+        req_tens_cm2 = flex_req_data.get("REQUIRED_As_TENSION_cm2", 0.0)
+        req_comp_cm2 = flex_req_data.get("REQUIRED_As_COMPRESSION_cm2", 0.0)
+        
+        excess_tens_mm2 = max(0.0, As_t - req_tens_cm2) * 100.0
+        excess_comp_mm2 = max(0.0, As_c - req_comp_cm2) * 100.0
+
+        sec_side_rebars = side_rebars_map.get(sec_name, [])
+        al_side_calc_mm2 = sum((r.qty * (math.pi * (r.dia ** 2) / 4.0)) for r in sec_side_rebars if r.qty > 0 and r.dia > 0)
+
         torsion = check_torsion_capacity(
             Tu_kgm=Tu, Vu_kg=Vu, Vc_kg=Vc_kg,
             b=data.b, h=data.h, d=d_t, covering=data.covering, stirrup_dia_mm=data.stirrup_dia,
             spacing_cm=data.stirrup_spacing, fc_prime=data.fc_prime, fy=data.fy, fy_shear=data.fy_shear,
-            num_legs=data.stirrup_legs, Al_provided_mm2=data.Al_provided_mm2
+            num_legs=data.stirrup_legs,
+            Al_side_mm2=al_side_calc_mm2,
+            As_excess_tens_mm2=excess_tens_mm2,
+            As_excess_comp_mm2=excess_comp_mm2,
+            Mu_kgm=Mu
         )
         
         # -----------------------------------------------------------------
@@ -1091,10 +1127,14 @@ def execute_engine(data: BeamInputData):
         print(f"    - Minimum Steel Ratio rho_min = {rho_min_calc:.5f}")
         print(f"    - Maximum Steel Ratio rho_max = {rho_max_calc:.5f}  (rho_b = {rho_b_calc:.5f})")
 
-        # Step 4 & 5: Provided Areas
+        # Step 4 & 5: Provided Areas (With explicit face identification)
+        tension_face_str = "TOP FACE (Support Hogging)" if is_top_tension else "BOTTOM FACE (Midspan Sagging)"
+        comp_face_str = "BOTTOM FACE" if is_top_tension else "TOP FACE"
         print("\n 4 & 5. THEORETICAL REQUIRED VS PROVIDED REINFORCEMENT AREA")
-        print(f"    - Tension Face Steel Provided (As)     = {As_t:.3f} cm2")
-        print(f"    - Compression Face Steel Provided (As') = {As_c:.3f} cm2")
+        print(f"    - Tension Face Steel Provided (As)      = {As_t:.3f} cm2  [{tension_face_str}]")
+        print(f"    - Compression Face Steel Provided (As')  = {As_c:.3f} cm2  [{comp_face_str}]")
+        if al_side_calc_mm2 > 0:
+            print(f"    - Side Face Steel Provided (Al,side)    = {al_side_calc_mm2/100.0:.3f} cm2 ({al_side_calc_mm2:.1f} mm2)")
 
         # Step 6: Internal Forces Equilibrium Check [SEPARATED COMPLIANCE DISPLAY PIPELINE]
         print("\n 6. SECTION INTERNAL FORCES EQUILIBRIUM & STRENGTH (phi*Mn)")
@@ -1251,12 +1291,18 @@ def execute_engine(data: BeamInputData):
             
         print(f"    - Core Space    : Aoh = {torsion.get('Aoh_cm2', 0.0):.1f} cm2 | ph = {torsion.get('ph_cm', 0.0):.1f} cm")
         
-        # Display explicit longitudinal steel performance data arrays
+        # Detailed longitudinal torsion reinforcement breakdown (ACI 318-14)
         al_req = torsion['al_required_mm2']
-        al_prov = data.Al_provided_mm2
+        al_prov = torsion['al_total_provided_mm2']
         al_ur = al_req / al_prov if al_prov > 0 else (999.0 if al_req > 0 else 0.0)
-        print(f"    - Req. Longitudinal Steel (Al) = {al_req:.1f} mm2")
-        print(f"    - Provided Longitudinal Steel  = {al_prov:.1f} mm2")
+        print(f"    - Base Theoretical Al (Total)  = {torsion['al_theoretical_mm2']:.1f} mm2 (Min = {torsion['al_min_mm2']:.1f} mm2)")
+        print(f"    - Flexural Comp. Relief (-dAl) = {torsion['al_reduction_mm2']:.1f} mm2 [ACI 22.7.6.2.2]")
+        print(f"    - Net Required Al              = {al_req:.1f} mm2")
+        print("    - Provided Al Breakdown        :")
+        print(f"      * Side Rebars (Web Skin)     = {al_side_calc_mm2:.1f} mm2")
+        print(f"      * Excess Tension Face Steel  = {excess_tens_mm2:.1f} mm2 (As,prov={As_t:.2f} - As,req={req_tens_cm2:.2f} cm2)")
+        print(f"      * Excess Compression Steel   = {excess_comp_mm2:.1f} mm2 (As',prov={As_c:.2f} - As',req={req_comp_cm2:.2f} cm2)")
+        print(f"      * Total Effective Al Prov.   = {al_prov:.1f} mm2")
         print(f"    - Longitudinal Steel UR        = {al_ur:.3f}")
         
         print(f"    - TORSION STATUS : {torsion['status']} (UR = {torsion['Utilization_Ratio']:.3f})")
@@ -1306,11 +1352,19 @@ class ReportSheetWindow:
         self.canvas_base = tk.Canvas(self.top, bg="#0F172A", borderwidth=0, highlightthickness=0)
         self.canvas_base.pack(fill=tk.BOTH, expand=True, padx=25, pady=(0, 25))
         
-        # Clean typography sheet box frame mimicking premium plain paper properties
+                # Dark report document area
         self.text_area = tk.Text(
-            self.canvas_base, bg="#FFFFFF", fg="#0F172A", 
-            font=("Consolas", 10), relief="flat", padx=35, pady=35,
-            selectbackground="#93C5FD", selectforeground="#0F172A"
+            self.canvas_base,
+            bg="#0A0A0A",
+            fg="#FFFFFF",
+            insertbackground="#FFFFFF",
+            font=("Cascadia Mono", 10),
+            relief="flat",
+            borderwidth=0,
+            padx=35,
+            pady=35,
+            selectbackground="#FFFFFF",
+            selectforeground="#000000"
         )
         
         scrollbar = ttk.Scrollbar(self.canvas_base, orient="vertical", command=self.text_area.yview)
@@ -1378,10 +1432,11 @@ class BeamCalDashboard:
         self.sync_initial_data_state()
         
         # 3. Modern Dark Tech Obsidian Theme Setup
-        self.bg_main = "#0F172A" # Premium Slate Blue Midnight Dark
-        self.bg_card = "#1E293B" # Card frame backgrounds
-        self.fg_light = "#F8FAFC" # Bright slate white for readability
-        self.accent_blue = "#38BDF8" # Cyber Sky Blue Accent Highlights
+        self.bg_main = "#000000"  # Main application background
+        self.bg_card = "#101010"  # Card and panel background
+        self.fg_light = "#FFFFFF"  # Primary text color
+        self.accent_blue = "#FFFFFF"  # Primary highlight color
+
         self.root.configure(bg=self.bg_main)
         
         self.configure_dark_tech_styles()
@@ -1406,7 +1461,7 @@ class BeamCalDashboard:
         self.notebook.add(self.tab_forces, text=" Design Forces ")
         self.notebook.add(self.tab_rebars, text=" Dynamic Rebars ")
         
-        self.rebar_rows = {"INITIAL": {"top": [], "bot": []}, "MID": {"top": [], "bot": []}, "END": {"top": [], "bot": []}}
+        self.rebar_rows = {"INITIAL": {"top": [], "side": [], "bot": []}, "MID": {"top": [], "side": [], "bot": []}, "END": {"top": [], "side": [], "bot": []}}
         
         # 6. Hydrate and Build Control Fields
         self.build_geometry_tab()
@@ -1432,10 +1487,11 @@ class BeamCalDashboard:
     def configure_dark_tech_styles(self):
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("TNotebook", background=self.bg_main, borderwidth=0)
-        style.configure("TNotebook.Tab", background="#334155", foreground="#94A3B8", font=("Segoe UI", 9, "bold"), borderwidth=0, padding=[14, 8])
-        style.map("TNotebook.Tab", background=[("selected", self.accent_blue)], foreground=[("selected", "#0F172A")])
-        style.configure("TLabel", background="#1E293B", foreground=self.fg_light, font=("Segoe UI", 9))
+
+        style.configure("TNotebook",background=self.bg_main,borderwidth=0)
+        style.configure("TNotebook.Tab",background="#101010",foreground="#A3A3A3",font=("Segoe UI", 9, "bold"),borderwidth=0,padding=[14, 8])
+        style.map("TNotebook.Tab",background=[("selected", "#FFFFFF"),("active", "#262626")],foreground=[("selected", "#000000"),("active", "#FFFFFF")])
+        style.configure("TLabel",background=self.bg_card,foreground="#FFFFFF",font=("Segoe UI", 9))
         style.configure("Header.TLabel", background="#1E293B", foreground=self.accent_blue, font=("Segoe UI", 11, "bold"))
         style.configure("TEntry", fieldbackground="#334155", foreground="#FFFFFF", borderwidth=0, padding=4)
         style.configure("Action.TButton", font=("Segoe UI", 10, "bold"), background=self.accent_blue, foreground="#0F172A")
@@ -1450,7 +1506,7 @@ class BeamCalDashboard:
                     self.raw_state = json.load(f)
                     print(f"[INFO] Persistent profile loaded cleanly from '{self.json_filename}'")
                     return
-            except Exception:
+            except Exception:  # noqa: BLE001
                 print("[WARNING] Local file corrupted. Loading secure hardcoded template profile arrays into memory.")
         
         self.raw_state = {
@@ -1459,20 +1515,22 @@ class BeamCalDashboard:
             "stirrup_dia": 12.0, "stirrup_spacing": 10.0, "stirrup_legs": 4,
             "Al_provided_mm2": 1397.0,
             "forces": {
-                "INITIAL": {"Mu": 45582.5, "Vu": 98758.5, "Pu": 0.0, "Tu": 8753.31},
-                "MID":     {"Mu": -75917.952, "Vu": 54336.338, "Pu": 0.0, "Tu": 8753.31},
+                "INITIAL": {"Mu": -45582.5, "Vu": 98758.5, "Pu": 0.0, "Tu": 8753.31},
+                "MID":     {"Mu": 75917.952, "Vu": 54336.338, "Pu": 0.0, "Tu": 8753.31},
                 "END":     {"Mu": 0.0, "Vu": 0.0, "Pu": 0.0, "Tu": 0.0}
             },
             "rebars": {
                 "INITIAL": {
-                    "top": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}],
-                    "bot": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}, {"dia": 25.0, "qty": 2, "clear_dist": 2.5}]
-                },
-                "MID": {
-                    "top": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}, {"dia": 25.0, "qty": 3, "clear_dist": 2.5}],
+                    "top": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}, {"dia": 25.0, "qty": 2, "clear_dist": 2.5}],
+                    "side": [{"dia": 16.0, "qty": 4, "clear_dist": 0.0}],
                     "bot": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}]
                 },
-                "END": {"top": [], "bot": []}
+                "MID": {
+                    "top": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}],
+                    "side": [{"dia": 16.0, "qty": 4, "clear_dist": 0.0}],
+                    "bot": [{"dia": 25.0, "qty": 4, "clear_dist": 0.0}, {"dia": 25.0, "qty": 3, "clear_dist": 2.5}]
+                },
+                "END": {"top": [], "side": [], "bot": []}
             }
         }
 
@@ -1511,7 +1569,6 @@ class BeamCalDashboard:
         self.st_dia_var = tk.DoubleVar(value=self.raw_state.get("stirrup_dia", 12.0))
         self.st_space_var = tk.DoubleVar(value=self.raw_state.get("stirrup_spacing", 10.0))
         self.st_legs_var = tk.IntVar(value=self.raw_state.get("stirrup_legs", 4))
-        self.al_prov_var = tk.DoubleVar(value=self.raw_state.get("Al_provided_mm2", 1397.0))
         
         for var in [self.st_dia_var, self.st_space_var, self.st_legs_var]:
              var.trace_add("write", lambda *args: self.update_live_preview())
@@ -1531,9 +1588,6 @@ class BeamCalDashboard:
         f_right.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(4, 0))
         ttk.Label(f_right, text="Stirrup Legs (qty):").pack(anchor=tk.W)
         ttk.Entry(f_right, textvariable=self.st_legs_var).pack(fill=tk.X, pady=1)
-        
-        ttk.Label(self.tab_geo, text="Provided Longitudinal Torsion Steel, Al (mm2):").pack(anchor=tk.W, pady=(10, 0))
-        ttk.Entry(self.tab_geo, textvariable=self.al_prov_var).pack(fill=tk.X, pady=3)
 
     def build_forces_tab(self):
         sections = ["INITIAL", "MID", "END"]
@@ -1586,7 +1640,7 @@ class BeamCalDashboard:
             try:
                 if self.notebook.index(self.notebook.select()) == 2:
                     scroll_win.yview_scroll(int(-1 * (event.delta / 120)), "units")
-            except Exception:
+            except (tk.TclError, AttributeError):
                 pass
         self.root.bind_all("<MouseWheel>", _on_mousewheel)
 
@@ -1599,13 +1653,14 @@ class BeamCalDashboard:
 
         for sec in ["INITIAL", "MID", "END"]:
             self.rebar_rows[sec]["top"] = []
+            self.rebar_rows[sec]["side"] = []
             self.rebar_rows[sec]["bot"] = []
 
             sec_card = tk.LabelFrame(self.all_sections_container, text=f" {sec} SECTION SPAN LAYOUT ", font=("Segoe UI", 10, "bold"), bg="#1E293B", fg="#38BDF8", bd=1, relief="flat", padx=8, pady=8)
             sec_card.pack(fill=tk.X, padx=2, pady=10)
             
-            # Render Top Face Zone
-            ttk.Label(sec_card, text="Tension Rebars (Top Face Layers):", font=("Segoe UI", 8, "bold"), foreground="#94A3B8").pack(anchor=tk.W, padx=5, pady=(2, 0))
+            # 1. Render Top Face Zone
+            ttk.Label(sec_card, text="Top Rebars (Top Face):", font=("Segoe UI", 8, "bold"), foreground="#94A3B8").pack(anchor=tk.W, padx=5, pady=(2, 0))
             top_box = tk.Frame(sec_card, bg="#1E293B")
             top_box.pack(fill=tk.X, padx=5)
             for idx, layer in enumerate(self.raw_state["rebars"][sec].get("top", [])):
@@ -1613,11 +1668,24 @@ class BeamCalDashboard:
                 
             ctrl_top = tk.Frame(sec_card, bg="#1E293B")
             ctrl_top.pack(fill=tk.X, padx=5, pady=4)
-            ttk.Button(ctrl_top, text="+ Add Layer", style="Save.TButton", command=lambda s=sec: self.add_new_rebar_layer(s, "top"), width=12).pack(side=tk.LEFT, padx=2)
-            ttk.Button(ctrl_top, text="- Remove", style="Save.TButton", command=lambda s=sec: self.remove_last_rebar_layer(s, "top"), width=12).pack(side=tk.LEFT, padx=2)
+            ttk.Button(ctrl_top, text="+ Add Top Layer", style="Save.TButton", command=lambda s=sec: self.add_new_rebar_layer(s, "top"), width=15).pack(side=tk.LEFT, padx=2)
+            ttk.Button(ctrl_top, text="- Remove", style="Save.TButton", command=lambda s=sec: self.remove_last_rebar_layer(s, "top"), width=10).pack(side=tk.LEFT, padx=2)
             
-            # Render Bottom Face Zone
-            ttk.Label(sec_card, text="Compression Rebars (Bottom Face Layers):", font=("Segoe UI", 8, "bold"), foreground="#94A3B8").pack(anchor=tk.W, padx=5, pady=(6, 0))
+            # 2. Render Side Face Zone (Skin Rebars / Torsion Al)
+            ttk.Label(sec_card, text="Side Rebars / Web Skin (Torsion Al):", font=("Segoe UI", 8, "bold"), foreground="#38BDF8").pack(anchor=tk.W, padx=5, pady=(6, 0))
+            side_box = tk.Frame(sec_card, bg="#1E293B")
+            side_box.pack(fill=tk.X, padx=5)
+            self.raw_state["rebars"][sec].setdefault("side", [])
+            for idx, layer in enumerate(self.raw_state["rebars"][sec].get("side", [])):
+                self.render_rebar_row_inputs(side_box, sec, "side", idx, layer)
+                
+            ctrl_side = tk.Frame(sec_card, bg="#1E293B")
+            ctrl_side.pack(fill=tk.X, padx=5, pady=4)
+            ttk.Button(ctrl_side, text="+ Add Side Layer", style="Save.TButton", command=lambda s=sec: self.add_new_rebar_layer(s, "side"), width=15).pack(side=tk.LEFT, padx=2)
+            ttk.Button(ctrl_side, text="- Remove", style="Save.TButton", command=lambda s=sec: self.remove_last_rebar_layer(s, "side"), width=10).pack(side=tk.LEFT, padx=2)
+
+            # 3. Render Bottom Face Zone
+            ttk.Label(sec_card, text="Bottom Rebars (Bottom Face):", font=("Segoe UI", 8, "bold"), foreground="#94A3B8").pack(anchor=tk.W, padx=5, pady=(6, 0))
             bot_box = tk.Frame(sec_card, bg="#1E293B")
             bot_box.pack(fill=tk.X, padx=5)
             for idx, layer in enumerate(self.raw_state["rebars"][sec].get("bot", [])):
@@ -1625,8 +1693,8 @@ class BeamCalDashboard:
                 
             ctrl_bot = tk.Frame(sec_card, bg="#1E293B")
             ctrl_bot.pack(fill=tk.X, padx=5, pady=4)
-            ttk.Button(ctrl_bot, text="+ Add Layer", style="Save.TButton", command=lambda s=sec: self.add_new_rebar_layer(s, "bot"), width=12).pack(side=tk.LEFT, padx=2)
-            ttk.Button(ctrl_bot, text="- Remove", style="Save.TButton", command=lambda s=sec: self.remove_last_rebar_layer(s, "bot"), width=12).pack(side=tk.LEFT, padx=2)
+            ttk.Button(ctrl_bot, text="+ Add Bot Layer", style="Save.TButton", command=lambda s=sec: self.add_new_rebar_layer(s, "bot"), width=15).pack(side=tk.LEFT, padx=2)
+            ttk.Button(ctrl_bot, text="- Remove", style="Save.TButton", command=lambda s=sec: self.remove_last_rebar_layer(s, "bot"), width=10).pack(side=tk.LEFT, padx=2)
 
     def render_rebar_row_inputs(self, master_frame, sec, face, idx, data):
         row = tk.Frame(master_frame, bg="#1E293B")
@@ -1686,132 +1754,680 @@ class BeamCalDashboard:
 
     def update_live_preview(self):
         self.right_canvas.delete("all")
+
         try:
-            w = self.right_canvas.winfo_width()
-            h_canvas = self.right_canvas.winfo_height()
-            if w < 100 or h_canvas < 100: 
+            canvas_w = self.right_canvas.winfo_width()
+            canvas_h = self.right_canvas.winfo_height()
+
+            if canvas_w < 100 or canvas_h < 100:
                 return
-            
-            # Modern Smooth Rounded card visual wrapper base
-            self.draw_rounded_card_background(0, 0, w, h_canvas, 24, self.bg_card)
-            
+
+            # Main preview card
+            self.draw_rounded_card_background(
+                0,
+                0,
+                canvas_w,
+                canvas_h,
+                24,
+                self.bg_card
+            )
+
             b = self.b_var.get()
             h = self.h_var.get()
             cov = self.cov_var.get()
             st_dia = self.st_dia_var.get() / 10.0
-            
-            if b <= 0 or h <= 0 or cov < 0 or (2 * cov) >= b or (2 * cov) >= h:
-                self.right_canvas.create_text(w/2, h_canvas/2, text="[CRITICAL BOUNDS OVERFLOW]", fill="#EF4444", font=("Segoe UI", 12, "bold"))
+
+            if (
+                b <= 0
+                or h <= 0
+                or cov < 0
+                or (2 * cov) >= b
+                or (2 * cov) >= h
+            ):
+                self.right_canvas.create_text(
+                    canvas_w / 2,
+                    canvas_h / 2,
+                    text="[CRITICAL BOUNDS OVERFLOW]",
+                    fill="#EF4444",
+                    font=("Segoe UI", 12, "bold")
+                )
                 return
-                
-            box_max_w, box_max_h = w - 180, h_canvas - 160
-            scale = min(box_max_w / b, box_max_h / h)
-            
-            x_start = (w - (b * scale)) / 2
-            y_start = (h_canvas - (h * scale)) / 2
-            x_end, y_end = x_start + (b * scale), y_start + (h * scale)
+
+            # Reserved spaces prevent dimensions and labels from collapsing.
+            left_gutter = 115
+            right_gutter = 210
+            top_gutter = 90
+            bottom_gutter = 110
+
+            drawing_w = canvas_w - left_gutter - right_gutter
+            drawing_h = canvas_h - top_gutter - bottom_gutter
+
+            if drawing_w < 80 or drawing_h < 120:
+                self.right_canvas.create_text(
+                    canvas_w / 2,
+                    canvas_h / 2,
+                    text="ENLARGE THE PREVIEW PANEL",
+                    fill="#A3A3A3",
+                    font=("Segoe UI", 10, "bold")
+                )
+                return
+
+            # Scale the beam while preserving its original proportions.
+            scale = min(drawing_w / b, drawing_h / h)
+
+            beam_w = b * scale
+            beam_h = h * scale
+
+            x_start = left_gutter + ((drawing_w - beam_w) / 2)
+            y_start = top_gutter + ((drawing_h - beam_h) / 2)
+
+            x_end = x_start + beam_w
+            y_end = y_start + beam_h
+
             cov_px = cov * scale
-            
-            # 1. Outer Main Concrete Profile Bound
-            self.right_canvas.create_rectangle(x_start, y_start, x_end, y_end, outline="#475569", fill="#0F172A", width=3)
-            
-            #2. Retrieve the missing stirrup loop box.
-            self.right_canvas.create_rectangle(x_start + cov_px, y_start + cov_px, x_end - cov_px, y_end - cov_px, outline=self.accent_blue, width=2)
-            
-            # 3.Move the steel casing text to the bottom outer edge + drag the arrow pointing upwards to the casing line to prevent the steel from overlapping.
-            st_text = f"Stirrup: DB{self.st_dia_var.get():.0f} @ {self.st_space_var.get():.1f} cm (Legs: {self.st_legs_var.get()})"
-            text_y = y_end + 35
-            self.right_canvas.create_text((x_start + x_end)/2, text_y, text=st_text, fill=self.accent_blue, font=("Segoe UI", 9, "bold"))
-            # Draw a leader line with an arrow  pointing upwards towards the lower horizontal steel reinforcement bar.
-            self.right_canvas.create_line((x_start + x_end)/2, text_y - 12, (x_start + x_end)/2, y_end - cov_px, fill=self.accent_blue, width=1.5, arrow=tk.LAST)
-            
+            stirrup_px = st_dia * scale
+
+            dimension_color = "#FFFFFF"
+            extension_color = "#64748B"
+            concrete_color = "#111827"
+            concrete_border = "#475569"
+            top_rebar_color = "#EF4444"
+            bottom_rebar_color = "#10B981"
+            side_rebar_color = "#38BDF8"
+
+            # A balanced arrowhead used by every dimension line.
+            dimension_arrow_shape = (8, 10, 4)
+
+            # Draw the outer concrete section.
+            self.right_canvas.create_rectangle(
+                x_start,
+                y_start,
+                x_end,
+                y_end,
+                outline=concrete_border,
+                fill=concrete_color,
+                width=3
+            )
+
+            # Draw the stirrup.
+            self.right_canvas.create_rectangle(
+                x_start + cov_px,
+                y_start + cov_px,
+                x_end - cov_px,
+                y_end - cov_px,
+                outline=self.accent_blue,
+                width=2
+            )
+
             sec = self.active_sec_var.get()
             self.sync_active_ui_values_to_raw_state(sec)
-            
-            # 4. Draw Dynamic Top Layers (Ovals + Callouts With 0-Guard Check)
-            curr_y_top = y_start + cov_px + (st_dia * scale)
+
+            is_top_tension = sec != "MID"
+
+            top_face_tag = (
+                "[T] TENSION FACE"
+                if is_top_tension
+                else "[C] COMPRESSION FACE"
+            )
+
+            top_face_color = (
+                "#EF4444"
+                if is_top_tension
+                else "#38BDF8"
+            )
+
+            bottom_face_tag = (
+                "[C] COMPRESSION FACE"
+                if is_top_tension
+                else "[T] TENSION FACE"
+            )
+
+            bottom_face_color = (
+                "#38BDF8"
+                if is_top_tension
+                else "#10B981"
+            )
+
+            # Face labels are separated from the dimension lines.
+            self.right_canvas.create_text(
+                x_start,
+                y_start - 10,
+                text=top_face_tag,
+                fill=top_face_color,
+                font=("Segoe UI", 8, "bold"),
+                anchor=tk.W
+            )
+
+            self.right_canvas.create_text(
+                x_start,
+                y_end + 16,
+                text=bottom_face_tag,
+                fill=bottom_face_color,
+                font=("Segoe UI", 8, "bold"),
+                anchor=tk.W
+            )
+
+            # Store callouts and arrange them after all bars are drawn.
+            right_callouts = []
+
+            # Draw top reinforcement layers.
+            curr_y_top = y_start + cov_px + stirrup_px
+
             for layer in self.raw_state["rebars"][sec].get("top", []):
                 qty = layer.get("qty", 0)
                 dia = layer.get("dia", 0.0)
                 clear_dist = layer.get("clear_dist", 0.0)
-                
-                # Checking criteria: If no reinforcement is used or the value is 0 -> Skip this layer; do not show it.
+
                 if qty <= 0 or dia <= 0:
                     continue
-                    
-                d_px = (dia / 10.0) * scale
-                curr_y_top += (clear_dist * scale) + (d_px / 2.0)
-                
-                # Drag a line to indicate details to the right edge.
-                self.right_canvas.create_line(x_end - cov_px, curr_y_top, x_end + 30, curr_y_top, fill="#EF4444", width=1)
-                rebar_text = f"{qty}-DB{dia:.0f}"
-                if clear_dist > 0:
-                    rebar_text += f" (Clear={clear_dist:.1f}cm)"
-                self.right_canvas.create_text(x_end + 35, curr_y_top, text=rebar_text, fill="#EF4444", font=("Segoe UI", 9, "bold"), anchor=tk.W)
-                
-                # Draw circular steel wire dots based on actual pixels.
-                x_avail = (x_end - cov_px - st_dia*scale - d_px/2.0) - (x_start + cov_px + st_dia*scale + d_px/2.0)
-                for i in range(qty):
-                    cx = (x_start + cov_px + st_dia*scale + d_px/2.0) + (x_avail * i / (qty - 1) if qty > 1 else x_avail / 2)
-                    self.right_canvas.create_oval(cx - d_px/2.0, curr_y_top - d_px/2.0, cx + d_px/2.0, curr_y_top + d_px/2.0, fill="#EF4444", outline="#FFFFFF", width=1)
-                    
-                curr_y_top += (d_px / 2.0)
 
-            # 5. Draw Dynamic Bottom Layers (Ovals + Callouts With 0-Guard Check)
-            curr_y_bot = y_end - cov_px - (st_dia * scale)
+                d_px = (dia / 10.0) * scale
+
+                curr_y_top += (
+                    clear_dist * scale
+                ) + (d_px / 2.0)
+
+                rebar_text = f"{qty}-DB{dia:.0f}"
+
+                if clear_dist > 0:
+                    rebar_text += (
+                        f" (Clear={clear_dist:.1f}cm)"
+                    )
+
+                right_callouts.append({
+                    "target_y": curr_y_top,
+                    "text": rebar_text,
+                    "color": top_rebar_color
+                })
+
+                left_bar_limit = (
+                    x_start
+                    + cov_px
+                    + stirrup_px
+                    + (d_px / 2.0)
+                )
+
+                right_bar_limit = (
+                    x_end
+                    - cov_px
+                    - stirrup_px
+                    - (d_px / 2.0)
+                )
+
+                x_avail = right_bar_limit - left_bar_limit
+
+                for i in range(qty):
+                    if qty > 1:
+                        cx = (
+                            left_bar_limit
+                            + (x_avail * i / (qty - 1))
+                        )
+                    else:
+                        cx = (
+                            left_bar_limit
+                            + (x_avail / 2.0)
+                        )
+
+                    self.right_canvas.create_oval(
+                        cx - (d_px / 2.0),
+                        curr_y_top - (d_px / 2.0),
+                        cx + (d_px / 2.0),
+                        curr_y_top + (d_px / 2.0),
+                        fill=top_rebar_color,
+                        outline="#FFFFFF",
+                        width=1
+                    )
+
+                curr_y_top += d_px / 2.0
+
+            # Draw bottom reinforcement layers.
+            curr_y_bot = y_end - cov_px - stirrup_px
+
             for layer in self.raw_state["rebars"][sec].get("bot", []):
                 qty = layer.get("qty", 0)
                 dia = layer.get("dia", 0.0)
                 clear_dist = layer.get("clear_dist", 0.0)
-                
-                # Checking criteria: If no reinforcement is used or the value is 0 -> Skip this layer; do not show it.
+
                 if qty <= 0 or dia <= 0:
                     continue
-                    
+
                 d_px = (dia / 10.0) * scale
-                curr_y_bot -= (clear_dist * scale) + (d_px / 2.0)
-                
-                # Drag a line to indicate details to the right edge.
-                self.right_canvas.create_line(x_end - cov_px, curr_y_bot, x_end + 30, curr_y_bot, fill="#10B981", width=1)
+
+                curr_y_bot -= (
+                    clear_dist * scale
+                ) + (d_px / 2.0)
+
                 rebar_text = f"{qty}-DB{dia:.0f}"
+
                 if clear_dist > 0:
-                    rebar_text += f" (Clear={clear_dist:.1f}cm)"
-                self.right_canvas.create_text(x_end + 35, curr_y_bot, text=rebar_text, fill="#10B981", font=("Segoe UI", 9, "bold"), anchor=tk.W)
-                
-                # Draw circular steel wire dots based on actual pixels.
-                x_avail = (x_end - cov_px - st_dia*scale - d_px/2.0) - (x_start + cov_px + st_dia*scale + d_px/2.0)
+                    rebar_text += (
+                        f" (Clear={clear_dist:.1f}cm)"
+                    )
+
+                right_callouts.append({
+                    "target_y": curr_y_bot,
+                    "text": rebar_text,
+                    "color": bottom_rebar_color
+                })
+
+                left_bar_limit = (
+                    x_start
+                    + cov_px
+                    + stirrup_px
+                    + (d_px / 2.0)
+                )
+
+                right_bar_limit = (
+                    x_end
+                    - cov_px
+                    - stirrup_px
+                    - (d_px / 2.0)
+                )
+
+                x_avail = right_bar_limit - left_bar_limit
+
                 for i in range(qty):
-                    cx = (x_start + cov_px + st_dia*scale + d_px/2.0) + (x_avail * i / (qty - 1) if qty > 1 else x_avail / 2)
-                    self.right_canvas.create_oval(cx - d_px/2.0, curr_y_bot - d_px/2.0, cx + d_px/2.0, curr_y_bot + d_px/2.0, fill="#10B981", outline="#FFFFFF", width=1)
-                    
-                curr_y_bot -= (d_px / 2.0)
-            
-            # 6. Dynamic Dimensions Metrics Labels
-            self.right_canvas.create_line(x_start, y_start - 18, x_end, y_start - 18, fill=self.fg_light, width=1, arrow=tk.BOTH)
-            self.right_canvas.create_text((x_start + x_end)/2, y_start - 32, text=f"b = {b:.1f} cm", fill=self.fg_light, font=("Segoe UI", 9, "bold"))
-            
-            self.right_canvas.create_line(x_start - 18, y_start, x_start - 18, y_end, fill=self.fg_light, width=1, arrow=tk.BOTH)
-            self.right_canvas.create_text(x_start - 55, (y_start + y_end)/2, text=f"h = {h:.1f} cm", fill=self.fg_light, font=("Segoe UI", 9, "bold"))
-            
-            self.right_canvas.create_line(x_end + 18, y_start, x_end + 18, y_start + cov_px, fill=self.accent_blue, width=1, arrow=tk.BOTH)
-            self.right_canvas.create_line(x_end, y_start + cov_px, x_end + 25, y_start + cov_px, fill="#475569", width=1) 
-            self.right_canvas.create_text(x_end + 65, y_start + cov_px/2, text=f"cov = {cov:.1f} cm", fill=self.accent_blue, font=("Segoe UI", 8, "bold"))
-            
-            self.right_canvas.create_text(25, h_canvas - 25, text=f"MONITOR SEC SPAN: [{sec}] | IN-MEMORY ARCHITECTURE PANEL VIEW", fill="#64748B", font=("Segoe UI", 8, "italic"), anchor=tk.W)
-            
+                    if qty > 1:
+                        cx = (
+                            left_bar_limit
+                            + (x_avail * i / (qty - 1))
+                        )
+                    else:
+                        cx = (
+                            left_bar_limit
+                            + (x_avail / 2.0)
+                        )
+
+                    self.right_canvas.create_oval(
+                        cx - (d_px / 2.0),
+                        curr_y_bot - (d_px / 2.0),
+                        cx + (d_px / 2.0),
+                        curr_y_bot + (d_px / 2.0),
+                        fill=bottom_rebar_color,
+                        outline="#FFFFFF",
+                        width=1
+                    )
+
+                curr_y_bot -= d_px / 2.0
+
+            # Draw side reinforcement.
+            side_layers = self.raw_state["rebars"][sec].get(
+                "side",
+                []
+            )
+
+            total_side_qty = sum(
+                layer.get("qty", 0)
+                for layer in side_layers
+            )
+
+            if (
+                total_side_qty > 0
+                and (curr_y_bot - curr_y_top) > 20
+            ):
+                side_bars_per_face = math.ceil(
+                    total_side_qty / 2.0
+                )
+
+                y_step = (
+                    (curr_y_bot - curr_y_top)
+                    / (side_bars_per_face + 1)
+                )
+
+                side_dia = next(
+                    (
+                        layer.get("dia", 16.0)
+                        for layer in side_layers
+                        if layer.get("qty", 0) > 0
+                    ),
+                    16.0
+                )
+
+                side_dia_px = (
+                    side_dia / 10.0
+                ) * scale
+
+                x_left = (
+                    x_start
+                    + cov_px
+                    + stirrup_px
+                    + (side_dia_px / 2.0)
+                )
+
+                x_right = (
+                    x_end
+                    - cov_px
+                    - stirrup_px
+                    - (side_dia_px / 2.0)
+                )
+
+                bar_drawn = 0
+
+                for k in range(side_bars_per_face):
+                    y_pos = (
+                        curr_y_top
+                        + ((k + 1) * y_step)
+                    )
+
+                    if bar_drawn < total_side_qty:
+                        self.right_canvas.create_oval(
+                            x_left - (side_dia_px / 2.0),
+                            y_pos - (side_dia_px / 2.0),
+                            x_left + (side_dia_px / 2.0),
+                            y_pos + (side_dia_px / 2.0),
+                            fill=side_rebar_color,
+                            outline="#FFFFFF",
+                            width=1
+                        )
+                        bar_drawn += 1
+
+                    if bar_drawn < total_side_qty:
+                        self.right_canvas.create_oval(
+                            x_right - (side_dia_px / 2.0),
+                            y_pos - (side_dia_px / 2.0),
+                            x_right + (side_dia_px / 2.0),
+                            y_pos + (side_dia_px / 2.0),
+                            fill=side_rebar_color,
+                            outline="#FFFFFF",
+                            width=1
+                        )
+                        bar_drawn += 1
+
+                mid_y_side = (
+                    curr_y_top + curr_y_bot
+                ) / 2.0
+
+                right_callouts.append({
+                    "target_y": mid_y_side,
+                    "text": (
+                        f"{total_side_qty}-DB"
+                        f"{side_dia:.0f} (Side/Al)"
+                    ),
+                    "color": side_rebar_color
+                })
+
+            # Arrange right-side labels with minimum vertical spacing.
+            if right_callouts:
+                right_callouts.sort(
+                    key=lambda item: item["target_y"]
+                )
+
+                label_min_y = y_start + 55
+                label_max_y = y_end - 18
+                callout_count = len(right_callouts)
+
+                if callout_count > 1:
+                    available_height = (
+                        label_max_y - label_min_y
+                    )
+
+                    label_gap = min(
+                        26,
+                        available_height
+                        / (callout_count - 1)
+                    )
+                else:
+                    label_gap = 0
+
+                label_positions = []
+
+                for item in right_callouts:
+                    desired_y = max(
+                        label_min_y,
+                        min(
+                            item["target_y"],
+                            label_max_y
+                        )
+                    )
+
+                    if label_positions:
+                        desired_y = max(
+                            desired_y,
+                            label_positions[-1] + label_gap
+                        )
+
+                    label_positions.append(desired_y)
+
+                if (
+                    label_positions
+                    and label_positions[-1] > label_max_y
+                ):
+                    shift_up = (
+                        label_positions[-1] - label_max_y
+                    )
+
+                    label_positions = [
+                        position - shift_up
+                        for position in label_positions
+                    ]
+
+                x_end - cov_px
+                label_x = x_end + 42
+
+                for item, label_y in zip(
+                    right_callouts,
+                    label_positions
+                ):
+                    target_y = item["target_y"]
+                    color = item["color"]
+
+                                    # Draw a clean, straight reinforcement leader line.
+                    line_start_x = x_end - cov_px
+                    line_end_x = label_x - 8
+
+                    self.right_canvas.create_line(
+                        line_start_x,
+                        target_y,
+                        line_end_x,
+                        target_y,
+                        fill=color,
+                        width=1.5,
+                        capstyle=tk.ROUND
+                    )
+
+                    # Draw a small connection point at the section edge.
+                    self.right_canvas.create_oval(
+                        line_start_x - 2,
+                        target_y - 2,
+                        line_start_x + 2,
+                        target_y + 2,
+                        fill=color,
+                        outline=color
+                    )
+
+                    self.right_canvas.create_text(
+                        label_x,
+                        target_y,
+                        text=item["text"],
+                        fill=color,
+                        font=("Segoe UI", 9, "bold"),
+                        anchor=tk.W
+                    )
+
+            # Width dimension.
+            width_dim_y = y_start - 34
+
+            self.right_canvas.create_line(
+                x_start,
+                y_start - 5,
+                x_start,
+                width_dim_y,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                x_end,
+                y_start - 5,
+                x_end,
+                width_dim_y,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                x_start,
+                width_dim_y,
+                x_end,
+                width_dim_y,
+                fill=dimension_color,
+                width=1.5,
+                arrow=tk.BOTH,
+                arrowshape=dimension_arrow_shape
+            )
+
+            self.right_canvas.create_text(
+                (x_start + x_end) / 2,
+                width_dim_y - 14,
+                text=f"b = {b:.1f} cm",
+                fill=dimension_color,
+                font=("Segoe UI", 9, "bold")
+            )
+
+            # Height dimension.
+            height_dim_x = x_start - 34
+
+            self.right_canvas.create_line(
+                x_start - 5,
+                y_start,
+                height_dim_x,
+                y_start,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                x_start - 5,
+                y_end,
+                height_dim_x,
+                y_end,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                height_dim_x,
+                y_start,
+                height_dim_x,
+                y_end,
+                fill=dimension_color,
+                width=1.5,
+                arrow=tk.BOTH,
+                arrowshape=dimension_arrow_shape
+            )
+
+            self.right_canvas.create_text(
+                height_dim_x - 12,
+                (y_start + y_end) / 2,
+                text=f"h = {h:.1f} cm",
+                fill=dimension_color,
+                font=("Segoe UI", 9, "bold"),
+                anchor=tk.E
+            )
+
+            # Concrete cover dimension.
+            cover_dim_x = x_end + 24
+
+            self.right_canvas.create_line(
+                x_end + 5,
+                y_start,
+                cover_dim_x,
+                y_start,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                x_end + 5,
+                y_start + cov_px,
+                cover_dim_x,
+                y_start + cov_px,
+                fill=extension_color,
+                width=1
+            )
+
+            self.right_canvas.create_line(
+                cover_dim_x,
+                y_start,
+                cover_dim_x,
+                y_start + cov_px,
+                fill=self.accent_blue,
+                width=1.5,
+                arrow=tk.BOTH,
+                arrowshape=(7, 9, 3)
+            )
+
+            self.right_canvas.create_text(
+                cover_dim_x + 13,
+                y_start + (cov_px / 2.0),
+                text=f"cov = {cov:.1f} cm",
+                fill=self.accent_blue,
+                font=("Segoe UI", 8, "bold"),
+                anchor=tk.W
+            )
+
+            # Stirrup callout below the beam.
+            stirrup_text = (
+                f"Stirrup: DB{self.st_dia_var.get():.0f} "
+                f"@ {self.st_space_var.get():.1f} cm "
+                f"(Legs: {self.st_legs_var.get()})"
+            )
+
+            beam_center_x = (
+                x_start + x_end
+            ) / 2.0
+
+            stirrup_label_y = y_end + 51
+            stirrup_elbow_y = y_end + 31
+            stirrup_target_y = y_end - cov_px
+
+            self.right_canvas.create_line(
+                beam_center_x,
+                stirrup_target_y,
+                beam_center_x,
+                stirrup_elbow_y,
+                beam_center_x + 22,
+                stirrup_elbow_y,
+                fill=self.accent_blue,
+                width=1.5,
+                arrow=tk.FIRST,
+                arrowshape=(8, 10, 4)
+            )
+
+            self.right_canvas.create_text(
+                beam_center_x,
+                stirrup_label_y,
+                text=stirrup_text,
+                fill=self.accent_blue,
+                font=("Segoe UI", 9, "bold")
+            )
+
+            # Footer status.
+            self.right_canvas.create_text(
+                25,
+                canvas_h - 20,
+                text=(
+                    f"MONITOR SEC SPAN: [{sec}] | "
+                    f"IN-MEMORY ARCHITECTURE PANEL VIEW"
+                ),
+                fill="#64748B",
+                font=("Segoe UI", 8, "italic"),
+                anchor=tk.W
+            )
+
         except (ValueError, tk.TclError):
             pass
 
     def sync_active_ui_values_to_raw_state(self, sec):
-        for face in ["top", "bot"]:
-            if sec in self.rebar_rows and face in self.rebar_rows[sec] and self.rebar_rows[sec][face]:
+        for face in ["top", "side", "bot"]:
+            if sec in self.rebar_rows and face in self.rebar_rows[sec]:
                 self.raw_state["rebars"][sec][face] = []
                 for row_data in self.rebar_rows[sec][face]:
                     try:
                         q, d, c = row_data["qty"].get(), row_data["dia"].get(), row_data["clear_dist"].get()
                         if q > 0:
                             self.raw_state["rebars"][sec][face].append({"qty": q, "dia": d, "clear_dist": c})
-                    except Exception:
+                    except (tk.TclError, ValueError):
                         pass
 
     def sync_all_active_ui_values_to_raw_state(self):
@@ -1828,7 +2444,6 @@ class BeamCalDashboard:
         self.raw_state["stirrup_dia"] = self.st_dia_var.get()
         self.raw_state["stirrup_spacing"] = self.st_space_var.get()
         self.raw_state["stirrup_legs"] = self.st_legs_var.get()
-        self.raw_state["Al_provided_mm2"] = self.al_prov_var.get()
         
         for sec in ["INITIAL", "MID", "END"]:
             for key in ["Mu", "Vu", "Pu", "Tu"]:
@@ -1853,12 +2468,15 @@ class BeamCalDashboard:
             forcesmid=SectionForces(**self.raw_state["forces"]["MID"]),
             forcesend=SectionForces(**self.raw_state["forces"]["END"]),
             
-            topinitial_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["INITIAL"]["top"]] or [RebarLayer(dia=0.0, qty=0)],
-            botinitial_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["INITIAL"]["bot"]] or [RebarLayer(dia=0.0, qty=0)],
-            topmid_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["MID"]["top"]] or [RebarLayer(dia=0.0, qty=0)],
-            botmid_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["MID"]["bot"]] or [RebarLayer(dia=0.0, qty=0)],
-            topend_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["END"]["top"]] or [RebarLayer(dia=0.0, qty=0)],
-            botend_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["END"]["bot"]] or [RebarLayer(dia=0.0, qty=0)]
+            topinitial_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["INITIAL"].get("top", [])] or [RebarLayer(dia=0.0, qty=0)],
+            sideinitial_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["INITIAL"].get("side", [])],
+            botinitial_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["INITIAL"].get("bot", [])] or [RebarLayer(dia=0.0, qty=0)],
+            topmid_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["MID"].get("top", [])] or [RebarLayer(dia=0.0, qty=0)],
+            sidemid_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["MID"].get("side", [])],
+            botmid_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["MID"].get("bot", [])] or [RebarLayer(dia=0.0, qty=0)],
+            topend_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["END"].get("top", [])] or [RebarLayer(dia=0.0, qty=0)],
+            sideend_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["END"].get("side", [])],
+            botend_rebars=[RebarLayer(**r) for r in self.raw_state["rebars"]["END"].get("bot", [])] or [RebarLayer(dia=0.0, qty=0)]
         )
 
     def load_state_from_json_file(self):
@@ -1887,8 +2505,8 @@ class BeamCalDashboard:
             self.rebuild_all_rebar_sections_ui()
             self.update_live_preview()
             messagebox.showinfo("Sync Successful", "RAM configurations synchronized smoothly from input.json profiles.")
-        except Exception as e:
-            messagebox.showerror("Sync Failure", f"Failed to execute dynamic data parsing mapping: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Sync Failure", f"Failed to execute dynamic data parsing mapping: {e}")
 
     def commit_state_to_json_file(self):
         try:
@@ -1896,8 +2514,8 @@ class BeamCalDashboard:
             with open(self.json_filename, "w", encoding="utf-8") as f:
                 json.dump(self.raw_state, f, indent=4)
             messagebox.showinfo("Export Successful", "Current structural matrix state saved into input.json profile settings.")
-        except Exception as e:
-            messagebox.showerror("Export Failure", f"Failed to capture parameters: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Export Failure", f"Failed to capture parameters: {e}")
 
     def trigger_backend_calculation(self):
         try:
@@ -1908,8 +2526,8 @@ class BeamCalDashboard:
             captured_report = output_buffer.getvalue()
             
             ReportSheetWindow(self.root, captured_report)
-        except Exception as e:
-            messagebox.showerror("Execution Aborted", f"Solver engine collapsed inside analytical math loops: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Execution Aborted", f"Solver engine collapsed inside analytical math loops: {e}")
 
 
 if __name__ == "__main__":
